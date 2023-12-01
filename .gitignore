@@ -1,0 +1,12 @@
+# Models
+*.pth.tar
+
+# Images
+*.jpg
+*.jpeg
+*.bmp
+*.gif
+*.png
+
+# CSV files
+*.csv
