@@ -36,10 +36,9 @@ Build classic CV algorithm using the obtained features of the model.
         - Batch size `10`
         - Num epochs `450`
 
-5.
-Some images
-![1](D:\ML_Projects\interf_seg\figure\results_1.png)
-![2](D:\ML_Projects\interf_seg\figure\results_2.png)
+5. Some images
+![1](figure\results_1.png)
+![2](figure\results_2.png)
 
 ## TODO list
 - Test following models `PSPNet`, `Attention U-net`;
