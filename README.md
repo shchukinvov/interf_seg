@@ -32,12 +32,12 @@ Build classic CV algorithm using the obtained features of the model.
     - Received using:
         - `MultiScale Unet with (8, 16, 32, 64) features`;
         - `Adam` optimizer;
-        - Learning rate `4e-4`
-        - Batch size `10`
-        - Num epochs `450`
+        - Learning rate: `4e-4`
+        - Batch size: `10`
+        - Num epochs: `450`
 
-5.
 Some images
+
 ![1](https://github.com/shchukinvov/interf_seg/blob/main/figure/results_1.png)
 ![2](https://github.com/shchukinvov/interf_seg/blob/main/figure/results_2.png)
 
