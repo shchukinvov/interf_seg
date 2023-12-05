@@ -9,7 +9,7 @@ VAL_MASK_DIR = 'D:/ML_Projects/interf_seg/data/test/masks'
 
 TRAINING = True
 PRETRAIN = False
-LOAD_CP = "model_8.pth"
+LOAD_CP = "pretrain_model_27.pth"
 SAVE_MODEL = True
 
 CP_PATH = 'D:/ML_Projects/interf_seg/experiments_reg'
@@ -17,10 +17,10 @@ EXPERIMENT_LIST = 'D:/ML_Projects/interf_seg/experiments_reg/experiment_list.jso
 
 EXPERIMENT_PARAMS = {
     "model": {
-        "name": "MSUnet",
+        "name": "AttUnet",
         "params": {
             "in_channels": 1,
-            "features": (16, 32, 64, 128)
+            "features": (8, 16, 32, 64)
         }
     },
 
@@ -37,6 +37,7 @@ EXPERIMENT_PARAMS = {
         "name": "Adam",
         "params": {
             "lr": 4e-4,
+            "betas": (0.95, 0.999),
             # "weight_decay": 0.01
         }
     },
@@ -44,7 +45,7 @@ EXPERIMENT_PARAMS = {
     "scheduler": {
         "name": "StepLR",
         "params": {
-            "step_size": 11,
+            "step_size": 12,
             "gamma": 0.9
         }
     },

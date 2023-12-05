@@ -85,6 +85,29 @@ class MultiConv(nn.Module):
         return self.conv(x)
 
 
+class AttBlock(nn.Module):
+    def __init__(self, F_g, F_l, F_i):
+        super(AttBlock, self).__init__()
+        self.W_g = nn.Sequential(nn.Conv2d(F_g, F_i, 1, 1, 0, bias=True),
+                                 nn.BatchNorm2d(F_i),
+                                 )
+
+        self.W_x = nn.Sequential(nn.Conv2d(F_l, F_i, 1, 1, 0, bias=True),
+                                 nn.BatchNorm2d(F_i),
+                                 )
+
+        self.psi = nn.Sequential(nn.Conv2d(F_i, 1, 1, 1, 0, bias=True),
+                                 nn.BatchNorm2d(1),
+                                 nn.Sigmoid())
+
+    def forward(self, x, g):
+        x1 = self.W_x(x)
+        g1 = self.W_g(g)
+        psi = nn.ReLU(inplace=True)(x1+g1)
+        psi = self.psi(psi)
+        return x * psi
+
+
 class UNET(nn.Module):
     def __init__(
             self, in_channels=3, out_channels=1, features=(64, 128, 256, 512)
@@ -225,12 +248,12 @@ class MSUnet(nn.Module):
         self.downs = nn.ModuleList()
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        # Encode
+        # Encoder
         for feature in features:
             self.downs.append(MultiConv(in_channels, feature))
             in_channels = feature
 
-        # Decode
+        # Decoder
         for feature in reversed(features):
             self.ups.append(nn.ConvTranspose2d(feature*2, feature, kernel_size=2, stride=2))
             self.ups.append(DoubleConv(feature*2, feature))
@@ -265,9 +288,62 @@ class MSUnet(nn.Module):
 
         return nn.Sigmoid()(self.final_conv(x))
 
+
+class AttUnet(nn.Module):
+    def __init__(self, in_channels=1, out_channels=1, features=(8, 16, 32, 64)):
+        super(AttUnet, self).__init__()
+        self.ups = nn.ModuleList()
+        self.downs = nn.ModuleList()
+        self.att_blocks = nn.ModuleList()
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        # Encoder
+        for feature in features:
+            self.downs.append(DoubleConv(in_channels, feature))
+            in_channels = feature
+
+        # Decoder
+        for feature in reversed(features):
+            self.ups.append(nn.Sequential(nn.Upsample(scale_factor=2),
+                                          nn.Conv2d(feature*2, feature, 1, 1, 0, bias=False),
+                                          )
+                            )
+            self.ups.append(DoubleConv(feature*2, feature))
+            self.att_blocks.append(AttBlock(F_g=feature, F_l=feature, F_i=feature//2))
+
+        self.bottleneck = DoubleConv(features[-1], features[-1] * 2)
+        self.final_conv = nn.Conv2d(features[0], out_channels, 1, 1, 0, bias=False)
+
+    def device(self):
+        return next(self.parameters()).device
+
+    def forward(self, x):
+        skip_connections = []
+        for i, down in enumerate(self.downs):
+            x = down(x)
+            skip_connections.append(x)
+            x = self.pool(x)
+
+        x = self.bottleneck(x)
+        skip_connections = skip_connections[::-1]
+
+        for idx in range(0, len(self.ups), 2):
+            x = self.ups[idx](x)
+
+            skip_connection = skip_connections[idx // 2]
+
+            skip_connection = self.att_blocks[idx // 2](x=skip_connection, g=x)
+
+            concat_skip = torch.cat((skip_connection, x), dim=1)
+            x = self.ups[idx + 1](concat_skip)
+
+        return nn.Sigmoid()(self.final_conv(x))
+
+
+
 """ TEST """
 if __name__ == "__main__":
-    model = UNET(in_channels=1)
+    model = AttUnet()
     test_input = torch.rand(1, 1, 224, 224)
     output = model(test_input)
     assert test_input.shape == output.shape

@@ -3,8 +3,6 @@ from interf_seg.data.interf_generator import init_interf_generator
 from utils import *
 from interf_seg.configs.collection import module_collection
 from interf_seg.configs.experiment import *
-from PIL import Image
-import os
 
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -31,18 +29,16 @@ def main(model, criterion, optimizer, scheduler, seed, num_epochs, batch_size):
         # train_loss = train_fn(model_, dataloaders_, criterion_, optimizer_, num_epochs, DEVICE, scheduler_, validation=False)
         if SAVE_MODEL:
             ps = ExperimentLogger(EXPERIMENT_LIST)
-            model_path = "pretrain_model_" + str(len(ps)) + ".pth"
+            model_path = "model_" + str(len(ps)) + ".pth"
             torch.save(model_.state_dict(), os.path.join(CP_PATH, model_path))
             val_scores = validate_model(model_, postprocessing=False, save_predictions=False, show_results=True)
             ps.parse_and_log(val_scores, model_path, **EXPERIMENT_PARAMS)
-        show_losses(train_loss, val_loss, k=4)
+        show_losses(train_loss, val_loss)
 
     else:
-        # im = Image.open("D:/ML_Projects/interf_seg/data/test/interfs/9003.bmp").convert("L")
+        im = np.array(Image.open("D:/ML_Projects/interf_seg/data/link_im2.bmp").convert("L"))
         # show_model_preds(model_, im)
-
-        # show_model_featuremap(model_, im)
-        validate_model(model_, postprocessing=True, save_predictions=False, show_results=True)
+        show_model_featuremap(model_, im)
         # validate_model(model_, postprocessing=True, save_predictions=False, show_results=True)
 
 

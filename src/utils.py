@@ -1,14 +1,15 @@
 import os
-
-import PIL.Image
+import torch
+from torchvision.transforms.v2 import Resize
 from torchvision.utils import save_image
-from tqdm import tqdm
 import numpy as np
+from tqdm import tqdm
 import cv2
+from PIL import  Image
+import matplotlib.pyplot as plt
 import json
 import random
 from math import ceil, sqrt
-import matplotlib.pyplot as plt
 from dataset import init_test_loader
 from interf_seg.configs.transforms import *
 from interf_seg.configs.experiment import *
@@ -56,7 +57,6 @@ class ExperimentLogger:
         exp_list.append(exp_info)
         updated_exp_data = {"counter": counter, "experiments": exp_list}
         self.write(updated_exp_data)
-        return
 
 
 def seed_all(seed: int) -> None:
@@ -72,13 +72,13 @@ def seed_all(seed: int) -> None:
     torch.backends.cudnn.deterministic = True
 
 
-def show_losses(train_loss: list, val_loss: list, k=1) -> None:
+def show_losses(train_loss: list, val_loss: list) -> None:
     """
     :param train_loss: list of train losses during training
     :param val_loss: list of validation losses during training
-    :param k: validating every p epochs
     :return: loss/epoch plot
     """
+    k = ceil(len(train_loss) / len(val_loss))
     plt.plot(train_loss, label='train_loss')
     plt.plot(np.arange(0, len(val_loss) * k, k), val_loss, label='val_loss')
     plt.legend()
@@ -86,23 +86,20 @@ def show_losses(train_loss: list, val_loss: list, k=1) -> None:
     plt.show()
 
 
-def show_model_preds(model, image: PIL.Image.Image) -> None:
+def show_model_preds(model, image: np.ndarray) -> None:
 
-    height, width = image.size
+    height, width = image.shape
 
-    image = TYPE_TRANSFORMS(image)
-    r_image = BASIC_TRANSFORMS(image)
-
-    m, s = r_image.min(), r_image.max() - r_image.min() + 1e-6
-    r_image = v2.Normalize(mean=[m], std=[s])(r_image)
+    t_image = VAL_TRANSFORMS(image=image)['image']
+    image = ToTensorV2()(image=image)['image']
 
     device = model.device()
     model.eval()
     with torch.no_grad():
-        r_image = r_image.unsqueeze(0).to(device)
-        mask = (model(r_image) > 0.5).squeeze(0).float()
+        t_image = t_image.unsqueeze(0).to(device)
+        mask = (model(t_image) > 0.5).squeeze(0).float()
 
-    mask = v2.Resize((width, height), antialias=False)(mask).cpu()
+    mask = Resize((height, width), antialias=True)(mask).cpu()
 
     masked_image = image * mask
     figure = plt.figure(figsize=(12, 6))
@@ -114,7 +111,6 @@ def show_model_preds(model, image: PIL.Image.Image) -> None:
     plt.imshow(masked_image.permute(1, 2, 0).numpy(), cmap="gray")
 
     plt.show()
-    return
 
 
 def train_fn(model, dataloaders, criterion, optimizer, num_epochs, device, scheduler=None, validation=True):
@@ -134,8 +130,8 @@ def train_fn(model, dataloaders, criterion, optimizer, num_epochs, device, sched
             model.train()
 
             for inputs, masks in train_dataloader:
-                inputs = inputs.to(device)
-                masks = masks.to(device)
+                inputs = inputs.to(device).clamp(0, 1)
+                masks = masks.to(device).clamp(0, 1)
 
                 optimizer.zero_grad()
                 preds = model(inputs)
@@ -150,14 +146,15 @@ def train_fn(model, dataloaders, criterion, optimizer, num_epochs, device, sched
             mean_loss = sum(losses) / len(losses)
             train_loss.append(mean_loss)
             progress.set_postfix({f'Train loss': mean_loss})
+
         if validation:
             if epoch % 4 == 0:
                 with tqdm(total=len(val_dataloader)) as progress:
                     losses = []
                     model.eval()
                     for inputs, masks in val_dataloader:
-                        inputs = inputs.to(device)
-                        masks = masks.to(device)
+                        inputs = inputs.to(device).clamp(0, 1)
+                        masks = masks.to(device).clamp(0, 1)
 
                         with torch.set_grad_enabled(False):
                             preds = model(inputs)
@@ -186,7 +183,7 @@ def calc_iou_score(prediction: torch.Tensor, target: torch.Tensor, eps=1e-6) -> 
     :param prediction: tensor containing prediction mask
     :param target: tensor containing target mask
     :param eps: add smoothing
-    :return:
+    :return: IoU score for given prediction and target
     """
     assert prediction.device == target.device, "Different devices"
 
@@ -207,7 +204,7 @@ def calc_dice_score(prediction: torch.Tensor, target: torch.Tensor, eps=1e-6) ->
     :param prediction: tensor containing prediction mask
     :param target: tensor containing target mask
     :param eps: add smoothing
-    :return:
+    :return: dice score for given prediction and target
     """
     assert prediction.device == target.device, "Different devices"
 
@@ -252,7 +249,7 @@ def validate_model(model, save_predictions=False, postprocessing=False, show_res
                 dice_score = calc_dice_score(predicted_mask, mask)
 
                 masked_image = (image*predicted_mask).squeeze(0)
-                masked_image = v2.Resize(shape, antialias=False)(masked_image)
+                masked_image = Resize(shape, antialias=True)(masked_image)
 
             iou_scores.append(iou_score)
             dice_scores.append(dice_score)
@@ -286,11 +283,12 @@ def validate_model(model, save_predictions=False, postprocessing=False, show_res
     return mean_iou, min_iou
 
 
-def show_model_featuremap(model, image):
+def show_model_featuremap(model, image: np.ndarray) -> None:
+    if not hasattr(model, "show_featuremap"):
+        raise AttributeError("show_featuremap is not implemented in this model")
+
     model.eval()
     image = VAL_TRANSFORMS(image)
-    m, s = image.min(), image.max() - image.min() + 1e-6
-    image = v2.Normalize(mean=[m], std=[s])(image)
     device = model.device()
     with torch.no_grad():
         x = image.unsqueeze(0).to(device)
@@ -304,10 +302,9 @@ def show_model_featuremap(model, image):
                 plt.imshow(channel.cpu().numpy(), cmap='gray')
                 plt.axis('off')
             plt.show()
-    return
 
 
-def morph_transforms(x: torch.Tensor, threshold: float, mode: str, kernel_size: tuple) -> torch.Tensor:
+def morph_transforms(x: torch.Tensor, threshold: float, mode: str, kernel_size: tuple[int, int]) -> torch.Tensor:
     """
     Apply morphological transforms to the model's output
     :param x: Predicted mask with values from 0 to 1
@@ -333,6 +330,8 @@ def morph_transforms(x: torch.Tensor, threshold: float, mode: str, kernel_size: 
              "MORPH_OPEN": cv2.MORPH_OPEN,
              "MORPH_CLOSE": cv2.MORPH_CLOSE
              }
+    if mode not in modes:
+        raise RuntimeError(f'{mode} is not supported')
 
     if len(x.shape) > 3:
         masks = []
