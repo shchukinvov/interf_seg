@@ -36,7 +36,7 @@ def main(model, criterion, optimizer, scheduler, seed, num_epochs, batch_size):
         show_losses(train_loss, val_loss)
 
     else:
-        im = np.array(Image.open("D:/ML_Projects/interf_seg/data/link_im2.bmp").convert("L"))
+        im = np.array(Image.open("../data/link_im2.bmp").convert("L"))
         # show_model_preds(model_, im)
         show_model_featuremap(model_, im)
         # validate_model(model_, postprocessing=True, save_predictions=False, show_results=True)

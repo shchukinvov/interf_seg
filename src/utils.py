@@ -285,7 +285,7 @@ def validate_model(model, save_predictions=False, postprocessing=False, show_res
 
 def show_model_featuremap(model, image: np.ndarray) -> None:
     if not hasattr(model, "show_featuremap"):
-        raise AttributeError("show_featuremap is not implemented in this model")
+        raise AttributeError("show_featuremap method is not implemented in this model")
 
     model.eval()
     image = VAL_TRANSFORMS(image)

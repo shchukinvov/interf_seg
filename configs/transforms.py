@@ -25,8 +25,8 @@ if __name__ == "__main__":
     from PIL import Image
     import numpy as np
     import matplotlib.pyplot as plt
-    im_path1 = "D:/ML_Projects/interf_seg/data/test/interfs/9009.bmp"
-    im_path2 = "D:/ML_Projects/interf_seg/data/test/masks/9009.bmp"
+    im_path1 = "../data/test/interfs/9009.bmp"
+    im_path2 = "../data/test/masks/9009.bmp"
     im1 = np.array(Image.open(im_path1).convert("L"), dtype=np.uint8)
     im2 = np.array(Image.open(im_path2).convert("1"), dtype=np.uint8)
     t = TRAIN_TRANSFORMS(image=im1, mask=im2)
